@@ -257,8 +257,9 @@ $(function(){
             ui.draggable.position({of: $(this),my: 'left top',at: 'left top'});
             ui.draggable.draggable('option', 'revert', "invalid");
             // Se modifican los atributos src de los elementos movidos en el DOM
-            $($('.col-'+colArrastrada).children()[filArrastrada]).attr('src',imgContenedor);
             $($('.col-'+colContenedor).children()[filContenedor]).attr('src',imgArrastrada);
+            $($('.col-'+colArrastrada).children()[filArrastrada]).replaceWith('<img src="'+imgContenedor+'" class="elemento" />');
+            $($('.col-'+colArrastrada).children()[filArrastrada]).draggable();
           }
           else{
             ui.draggable.draggable('option', 'revert', "valid");
