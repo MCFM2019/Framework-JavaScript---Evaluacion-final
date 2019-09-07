@@ -1,3 +1,5 @@
+var temporizador= new Timer();
+
 function ColorBlancoTitulo(elemento, tiempo) {
   $(elemento).animate({
     color: '#fff'
@@ -296,8 +298,7 @@ function CambiaAspectoJuegoTerminado(){
   $('.panel-score').animate({width:'100%'})
   $('.time').hide('fast');
 }
-function ModificarReloj(){
-  var temporizador= new Timer();
+function ModificarReloj(temporizador,nomBoton){
   temporizador.every(1000,function(){
     var tiempo=$('#timer').text();
     var minutos=parseInt(tiempo.substr(0,2));
@@ -325,16 +326,35 @@ function ModificarReloj(){
       $('#timer').text(reloj);
     }
   })
-  temporizador.start();
+  if(nomBoton=='Iniciar'){
+
+  }
+  else{temporizador.clear()
+  }
 }
 $(function () {
   // Alternar el color en el titulo
   ColorBlancoTitulo($('.main-titulo'), 1500);
 
-  var btnInicio=$('.btn-reinicio');
-  btnInicio.on('click',function(){
-    ModificarReloj();
-    $(this).text('Reinicio');
+  $('.btn-reinicio').on('click',function(){
+    var nomBoton=$(this).text();
+    if(nomBoton=='Iniciar'){
+        $(this).text('Reiniciar');
+    }
+    else{
+      $('#score-text').text('0');
+      $('#movimientos-text').text('0');
+      $('#timer').text('02:00');
+      for(var i=0;i<7;i++){
+        for(var j=0;j<7;j++){
+          $('.elemento').addClass('elimina');
+        }
+      }
+      $('.elimina').remove();
+    }
+
+    ModificarReloj(temporizador,nomBoton);
+    temporizador.start();
     CargarTablero();
     CargaDragAndDrop();/* AQUI SE LLAMA LA FUNCION EN REEMPLAZO DE LAS LINEAS DE CODIGO */
   })
