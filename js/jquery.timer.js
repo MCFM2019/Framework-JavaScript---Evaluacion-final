@@ -1,188 +1,141 @@
-/*!
- * jQuery Timer Plugin
- * https://github.com/ajgon/jquery-timer
+/*
+ * Timer.js: A periodic timer for Node.js and the browser.
  *
- * Copyright 2012, Igor Rzegocki
- * Dual licensed under the MIT or GPL Version 2 licenses.
- * http://www.opensource.org/licenses/mit-license.php
- * http://www.opensource.org/licenses/GPL-2.0
+ * Copyright (c) 2012 Arthur Klepchukov, Jarvis Badgley, Florian SchÃ¤fer
+ * Licensed under the BSD license (BSD_LICENSE.txt)
+ *
+ * Version: 0.0.1
  *
  */
-/*jslint browser: true, nomen: true, white: true */
-/*properties
-    '#LIST#', _activate, _finish, _options, _passedTime, _pausedInterval,
-    _startTime, _status, _timerFunction, _timerID, extend, finishCallback,
-    getTime, indexOf, interval, kill, match, pause, pauseCallback, prototype,
-    push, resume, resumeCallback, splice, start, startCallback, status, stop,
-    stopCallback, timeout, timer, timerCallback, useSetTimeout
-*/
-
-var jQuery = typeof(jQuery) === 'undefined' ? null : jQuery;
-
-(function($) {
-
-    "use strict";
-
-    if($ === null) {
-        throw 'jQuery is not defined';
+(function (root, factory) {
+    if (typeof exports === 'object') {
+        module.exports = factory();
+    } else if (typeof define === 'function' && define.amd) {
+        define(factory);
+    } else {
+        root.Timer = factory();
     }
-
-    var Timer = function(options) {
-
-        var defaults = {
-            timerCallback:  function() {},
-            startCallback:  function() {},
-            pauseCallback:  function() {},
-            resumeCallback: function() {},
-            stopCallback:   function() {},
-            finishCallback: function() {},
-            interval:       1000,
-            timeout:        false,
-            useSetTimeout:  false
-        };
-
-        options.interval = parseInt(options.interval, 10);
-        options.interval = isNaN(options.interval) ? defaults.interval : options.interval;
-        options.timeout = parseInt(options.timeout, 10);
-        options.timeout = isNaN(options.timeout) ? defaults.timeout : options.timeout;
-        this._options = $.extend(defaults, options);
-
-        this._timerFunction = options.useSetTimeout ? 'Timeout' : 'Interval';
-        this._timerID = null;
-        this._startTime = 0;
-        this._pausedInterval = -1;
-        this._passedTime = 0;
-        this._status = 'stopped';
-    };
-
+})(this, function () {
+    function timeStringToMilliseconds(timeString) {
+        if (typeof timeString === 'string') {
+            if (isNaN(parseInt(timeString, 10))) {
+                timeString = '1' + timeString;
+            }
+            var match = timeString
+                .replace(/[^a-z0-9\.]/g, '')
+                .match(/(?:(\d+(?:\.\d+)?)(?:days?|d))?(?:(\d+(?:\.\d+)?)(?:hours?|hrs?|h))?(?:(\d+(?:\.\d+)?)(?:minutes?|mins?|m\b))?(?:(\d+(?:\.\d+)?)(?:seconds?|secs?|s))?(?:(\d+(?:\.\d+)?)(?:milliseconds?|ms))?/);
+            if (match[0]) {
+                return parseFloat(match[1] || 0) * 86400000 +  // days
+                       parseFloat(match[2] || 0) * 3600000 +   // hours
+                       parseFloat(match[3] || 0) * 60000 +     // minutes
+                       parseFloat(match[4] || 0) * 1000 +      // seconds
+                       parseInt(match[5] || 0, 10);            // milliseconds
+            }
+            if (!isNaN(parseInt(timeString, 10))) {
+                return parseInt(timeString, 10);
+            }
+        }
+        if (typeof timeString === 'number') {
+            return timeString;
+        }
+        return 0;
+    }
+    function millisecondsToTicks(milliseconds, resolution) {
+        return parseInt(milliseconds / resolution, 10) || 1;
+    }
+    function Timer(resolution) {
+        if (this instanceof Timer === false) {
+            return new Timer(resolution);
+        }
+        this._notifications = [];
+        this._resolution = timeStringToMilliseconds(resolution) || 1000;
+        this._running = false;
+        this._ticks = 0;
+        this._timer = null;
+        this._drift = 0;
+    }
     Timer.prototype = {
-        _activate: function() {
+        start: function () {
             var self = this;
-            this._startTime = new Date().getTime();
-            this._timerID = window['set' + this._timerFunction](function() {
-                self._passedTime = (new Date().getTime() - self._startTime);
-                if(self._options.timeout && self._passedTime >= self._options.timeout) {
-                    self._finish();
-                } else {
-                    self._options.timerCallback();
-                }
-            }, this._options.interval);
-        },
-
-        _finish: function() {
-            window['clear' + this._timerFunction](this._timerID);
-            this._startTime = 0;
-            this._pausedInterval = -1;
-            this._passedTime = 0;
-            this._timerID = null;
-            this._options.finishCallback();
-            this._status = 'finished';
-        },
-
-        start: function() {
-            if(this._startTime !== 0) {
-                throw 'Timer is running';
-            }
-            this._activate();
-            this._options.startCallback();
-            this._status = 'running';
-        },
-
-        pause: function() {
-            if(this._startTime === 0 || this._timerID === null) {
-                throw 'Timer not started';
-            }
-            window['clear' + this._timerFunction](this._timerID);
-            this._passedTime = (new Date().getTime() - this._startTime);
-            this._pausedInterval = this._passedTime % this._options.interval;
-            this._timerID = null;
-            this._options.pauseCallback();
-            this._status = 'paused';
-        },
-
-        resume: function(fullFrame) {
-            fullFrame = typeof(fullFrame) === 'undefined' ? false : fullFrame;
-            if(this._pausedInterval === -1) {
-                throw 'Timer not paused';
-            }
-            if(fullFrame) {
-                var self = this;
-                setTimeout(function() {
-                    self._options.timerCallback();
-                    if(!self._options.useSetTimeout) {
-                        self._activate();
+            if (!this._running) {
+                this._running = !this._running;
+                this._timer = setTimeout(function loopsyloop() {
+                    self._ticks++;
+                    for (var i = 0, l = self._notifications.length; i < l; i++) {
+                        if (self._notifications[i] && self._ticks % self._notifications[i].ticks === 0) {
+                            self._notifications[i].callback.call(self._notifications[i], { ticks: self._ticks, resolution: self._resolution });
+                        }
                     }
-                }, this._options.interval - this._pausedInterval);
+                    if (self._running) {
+                        self._timer = setTimeout(loopsyloop, self._resolution + self._drift);
+                        self._drift = 0;
+                    }
+                }, this._resolution + this._drift);
+                this._drift = 0;
+            }
+            return this;
+        },
+        stop: function () {
+            if (this._running) {
+                this._running = !this._running;
+                clearTimeout(this._timer);
+            }
+            return this;
+        },
+        reset: function () {
+            this.stop();
+            this._ticks = 0;
+            return this;
+        },
+        clear: function () {
+            this.reset();
+            this._notifications = [];
+            return this;
+        },
+        ticks: function () {
+            return this._ticks;
+        },
+        resolution: function () {
+            return this._resolution;
+        },
+        running: function () {
+            return this._running;
+        },
+        bind: function (when, callback) {
+            if (when && callback) {
+                var ticks = millisecondsToTicks(timeStringToMilliseconds(when), this._resolution);
+                this._notifications.push({
+                    ticks: ticks,
+                    callback: callback
+                });
+            }
+            return this;
+        },
+        unbind: function (callback) {
+            if (!callback) {
+                this._notifications = [];
             } else {
-                this._activate();
-            }
-            this._options.resumeCallback();
-            this._status = 'running';
-        },
-
-        stop: function() {
-            if(this._startTime === 0 || this._timerID === null) {
-                throw 'Timer not started';
-            }
-            this._finish();
-            this._options.stopCallback();
-            this._status = 'stopped';
-        },
-
-        kill: function() {
-            if(this._timerID !== null) {
-                window['clear' + this._timerFunction](this._timerID);
-                this._startTime = 0;
-                this._pausedInterval = -1;
-                this._timerID = null;
-                this._status = 'stopped';
-            }
-        },
-
-        status: function() {
-            return this._status;
-        }
-    };
-
-    $.timer = function(name, callback, interval, options) {
-        if(typeof(name) === 'undefined') {
-            return $.timer['#LIST#'];
-        }
-        if(typeof(name) !== 'string' || !name.match(/^[a-zA-Z][a-zA-Z_0-9]*$/)) {
-            throw 'Invalid timer name (it must start with a letter and cannot contain other characters than letters, numbers and underscore';
-        }
-        if(typeof(callback) === 'undefined') {
-            return $.timer[name];
-        }
-        if(callback === null) {
-            if($.timer[name]) {
-                $.timer[name].kill();
-                delete($.timer[name]);
-                var list_index = $.timer['#LIST#'].indexOf(name);
-                if(list_index > -1) {
-                    $.timer['#LIST#'].splice(list_index, 1);
+                for (var i = 0, l = this._notifications.length; i < l; i++) {
+                    if (this._notifications[i] && this._notifications[i].callback === callback) {
+                        this._notifications.splice(i, 1);
+                    }
                 }
             }
-            return true;
+            return this;
+        },
+        drift: function (timeDrift) {
+            this._drift = timeDrift;
+            return this;
         }
-        if(typeof(callback) !== 'function') {
-            throw 'Please provide a callback function for setTimer/setInterval function';
-        }
-        interval = parseInt(interval, 10);
-        if(isNaN(interval) || interval <= 0) {
-            throw 'Please provide an interval for timer (in seconds)';
-        }
-
-        options = options || {};
-
-        options.timerCallback = callback;
-        options.interval = interval;
-        $.timer[name] = new Timer(options);
-        $.timer['#LIST#'].push(name);
-
-        return $.timer[name];
     };
-
-    $.timer['#LIST#'] = [];
-
-}(jQuery));
+    Timer.prototype.every = Timer.prototype.bind;
+    Timer.prototype.after = function (when, callback) {
+        var self = this;
+        Timer.prototype.bind.call(self, when, function fn () {
+            Timer.prototype.unbind.call(self, fn);
+            callback.apply(this, arguments);
+        });
+        return this;
+    };
+    return Timer;
+});

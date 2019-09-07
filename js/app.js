@@ -273,6 +273,7 @@ function CargaDragAndDrop() {
             // Se modifican los atributos src de los elementos movidos en el DOM
             $($('.col-' + colContenedor).children()[filContenedor]).attr('src', imgArrastrada);
             $($('.col-' + colArrastrada).children()[filArrastrada]).replaceWith('<img src="' + imgContenedor + '" class="elemento" />');
+            Movimientos();
             CargarTablero();
           }
           else {
@@ -285,9 +286,56 @@ function CargaDragAndDrop() {
       }
     })
 }
+function Movimientos(){
+  var movim = Number($('#movimientos-text').text());
+  movim+=1;
+	$('#movimientos-text').text(movim);
+}
+function CambiaAspectoJuegoTerminado(){
+  $('.panel-tablero').hide('fast')
+  $('.panel-score').animate({width:'100%'})
+  $('.time').hide('fast');
+}
+function ModificarReloj(){
+  var temporizador= new Timer();
+  temporizador.every(1000,function(){
+    var tiempo=$('#timer').text();
+    var minutos=parseInt(tiempo.substr(0,2));
+    var segundos=parseInt(tiempo.substr(3,2));
+
+    if(segundos==0 && minutos==0){
+      temporizador.stop();
+      CambiaAspectoJuegoTerminado();
+    }
+    else{
+      if(segundos==0){
+        minutos-=1;
+        segundos=59;
+      }
+      else{segundos-=1;}
+
+      var minsStr,segsStr
+      minsStr='0'+minutos;
+      if(segundos.toString().length==1){
+        segsStr='0'+segundos;
+      }
+      else{segsStr=segundos;}
+
+      var reloj=minsStr+':'+segsStr;
+      $('#timer').text(reloj);
+    }
+  })
+  temporizador.start();
+}
 $(function () {
   // Alternar el color en el titulo
   ColorBlancoTitulo($('.main-titulo'), 1500);
-  CargarTablero();
-  CargaDragAndDrop();/* AQUI SE LLAMA LA FUNCION EN REEMPLAZO DE LAS LINEAS DE CODIGO */
+
+  var btnInicio=$('.btn-reinicio');
+  btnInicio.on('click',function(){
+    ModificarReloj();
+    $(this).text('Reinicio');
+    CargarTablero();
+    CargaDragAndDrop();/* AQUI SE LLAMA LA FUNCION EN REEMPLAZO DE LAS LINEAS DE CODIGO */
+  })
 })
