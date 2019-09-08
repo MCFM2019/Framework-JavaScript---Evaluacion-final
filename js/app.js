@@ -294,11 +294,13 @@ function Movimientos(){
 	$('#movimientos-text').text(movim);
 }
 function CambiaAspectoJuegoTerminado(){
-  $('.panel-tablero').hide('fast')
-  $('.panel-score').animate({width:'100%'})
+  $('.panel-tablero').hide('fast');
+  $('.panel-score').prepend('<h3>Juego terminado</h3>');
+  $('h3').addClass('titulo-over');
+  $('.panel-score').animate({width:'100%'});
   $('.time').hide('fast');
 }
-function ModificarReloj(temporizador,nomBoton){
+function ModificarReloj(temporizador){
   temporizador.every(1000,function(){
     var tiempo=$('#timer').text();
     var minutos=parseInt(tiempo.substr(0,2));
@@ -326,22 +328,23 @@ function ModificarReloj(temporizador,nomBoton){
       $('#timer').text(reloj);
     }
   })
-  if(nomBoton=='Iniciar'){
-
-  }
-  else{temporizador.clear()
-  }
 }
 $(function () {
   // Alternar el color en el titulo
   ColorBlancoTitulo($('.main-titulo'), 1500);
-
+  ModificarReloj(temporizador);
   $('.btn-reinicio').on('click',function(){
     var nomBoton=$(this).text();
     if(nomBoton=='Iniciar'){
         $(this).text('Reiniciar');
     }
     else{
+      temporizador.reset();
+      $('.panel-tablero').show('fast')
+      $('.titulo-over').remove();
+      $('.panel-score').animate({width:'25%'})
+      $('.time').show('fast');
+
       $('#score-text').text('0');
       $('#movimientos-text').text('0');
       $('#timer').text('02:00');
@@ -352,8 +355,6 @@ $(function () {
       }
       $('.elimina').remove();
     }
-
-    ModificarReloj(temporizador,nomBoton);
     temporizador.start();
     CargarTablero();
     CargaDragAndDrop();/* AQUI SE LLAMA LA FUNCION EN REEMPLAZO DE LAS LINEAS DE CODIGO */
